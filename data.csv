@@ -69,7 +69,7 @@ id_4225,YY79468,Sedan,Valentin,Yes,Sector 18,Sector 17,4
 id_4222,YY79465,Bus,John,No,Sector 20,Sector 2,5
 id_4219,YY79462,Sedan,Jay,No,Sector 12,Sector 1,3
 id_4219,YY79462,Sedan,Jay,No,Sector 10,Sector 18,3
-id_4227,YY79470,Sedan,Jane,Yes,Sector 13,Sector 11,1
+id_4227,YY79470,Sedan,Jane,Yes,Sector 13,Sector 11,6
 id_4232,YY79475,Bus,Hong,No,Sector 19,Sector 15,3
 id_4217,YY79460,Sedan,Zhou,No,Sector 4,Sector 2,1
 id_4219,YY79462,Sedan,Jay,Yes,Sector 20,Sector 3,4
@@ -106,7 +106,7 @@ id_4224,YY79467,Bus,Jobs,Yes,Sector 4,Sector 2,1
 id_4220,YY79463,Bus,Mike,Yes,Sector 12,Sector 3,2
 id_4217,YY79460,Sedan,Zhou,No,Sector 7,Sector 1,4
 id_4232,YY79475,Bus,Hong,Yes,Sector 16,Sector 17,1
-id_4215,YY79458,Sedan,Yang,No,Sector 8,Sector 13,2
+id_4215,YY79458,Sedan,Yang,No,Sector 8,Sector 13,200
 id_4213,YY79456,Sedan,Yifei,Yes,Sector 12,Sector 9,2
 id_4217,YY79460,Sedan,Zhou,No,Sector 3,Sector 18,3
 id_4221,YY79464,Sedan,Eason,No,Sector 3,Sector 13,3

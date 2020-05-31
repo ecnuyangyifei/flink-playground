@@ -1,21 +1,17 @@
 package com.ecnu.yangyifei.flink;
 
-import org.apache.flink.api.common.functions.AggregateFunction;
-import org.apache.flink.api.common.functions.FoldFunction;
-import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.serialization.SimpleStringEncoder;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple8;
 import org.apache.flink.api.java.utils.MultipleParameterTool;
-import org.apache.flink.core.fs.Path;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
-import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
-import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
-import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.util.Collector;
 
 
 public class Playground {
@@ -24,7 +20,6 @@ public class Playground {
     public static void main(String[] args) throws Exception {
         cabAnalytics(args);
     }
-
 
 
     private static void cabAnalytics(String[] args) throws Exception {
@@ -41,37 +36,66 @@ public class Playground {
         DataStreamSource<String> lines = env.readTextFile(dataPath);
         SingleOutputStreamOperator<Tuple8<String, String, String, String, String, String, String, Long>> cabData = lines.map(Playground::token);
 
-        SingleOutputStreamOperator<Tuple8<String, String, String, String, String, String, String, Long>> onTrip = cabData.filter(d -> d.f4.equals("Yes"));
-
         // most popular destination
-        SingleOutputStreamOperator<Tuple2<String, Long>> maxBy =
-                onTrip.map(Playground::destinationAndPassengers).keyBy(0).reduce(new ReduceFunction<Tuple2<String, Long>>() {
-                    @Override
-                    public Tuple2<String, Long> reduce(Tuple2<String, Long> value1, Tuple2<String, Long> value2) throws Exception {
-                        return new Tuple2<>(value1.f0, value1.f1 + value2.f1);
-                    }
-                }).keyBy(0).maxBy(1)
-//                        .window(GlobalWindows.create()).trigger(CountTrigger.of(1)).sum(1).windowAll(GlobalWindows.create())
-//                .trigger(CountTrigger.of(1)).maxBy(1)
-                ;
-        maxBy.print();
+//        cabData.map(Playground::destinationAndPassengers).keyBy(0).sum(1).map(Playground::fakeGroup).keyBy(0).maxBy(2).print();
 
-        // avg passengers cnt
-//        ReduceFunction<Tuple2<String, Long>> tuple2ReduceFunction = (value1, value2) -> new Tuple2<String, Long>(value1.f0, (value1.f1 + value2.f1) / 2);
-//        SingleOutputStreamOperator<Tuple2<String, Long>> avg = cabData.map(Playground::pickupAndPassengers).keyBy(d -> d.f0).reduce(tuple2ReduceFunction);
+        // avg num of passengers from each pickup location
+//        cabData.map(Playground::pickupAndPassengers).keyBy(0).process(new KeyedProcessFunction<Tuple, Tuple2<String, Long>, Tuple2<String, Double>>() {
 //
-////        cabData.map(Playground::pickupAndPassengers).keyBy(0).ap
-//        avg.print();
+//            ValueState<Long> sum;
+//            ValueState<Long> count;
+//
+//            @Override
+//            public void open(Configuration parameters) throws Exception {
+//                ValueStateDescriptor<Long> sumDesc = new ValueStateDescriptor<>("Sum", Long.class);
+//                sum = getRuntimeContext().getState(sumDesc);
+//                ValueStateDescriptor<Long> countDesc = new ValueStateDescriptor<>("Count", Long.class);
+//                count = getRuntimeContext().getState(countDesc);
+//            }
+//
+//            @Override
+//            public void processElement(Tuple2<String, Long> value, Context ctx, Collector<Tuple2<String, Double>> out) throws Exception {
+//                if (null == sum.value() || count.value() == null) {
+//                    sum.update(0L);
+//                    count.update(0L);
+//                }
+//                sum.update(sum.value() + value.f1);
+//                count.update(count.value() + 1);
+//                out.collect(new Tuple2<>(value.f0, sum.value() * 1.0 / count.value()));
+//            }
+//        }).print();
 
-//        SingleOutputStreamOperator<Tuple8<String, String, String, String, String, String, String, Long>> passengersSumByPerson = cabData
-//                .keyBy(0, 1, 2, 3).sum(7)
-//                ;
-//        if (isCluster) {
-//            final StreamingFileSink<Tuple8<String, String, String, String, String, String, String, Long>> sink = StreamingFileSink.forRowFormat(new Path("file:///opt/flink/res"), new SimpleStringEncoder<Tuple8<String, String, String, String, String, String, String, Long>>("UTF-8")).build();
-//            passengersSumByPerson.addSink(sink);
-//        }
-//        passengersSumByPerson.print();
+        // avg number of trips for each driver
+        cabData.filter(d -> d.f4.equals("Yes")).keyBy(d -> d.f3).process(new KeyedProcessFunction<String, Tuple8<String, String, String, String, String, String, String, Long>, Tuple2<String, Double>>() {
+            ValueState<Long> sum;
+            ValueState<Long> count;
+
+            @Override
+            public void open(Configuration parameters) throws Exception {
+                ValueStateDescriptor<Long> sumDesc = new ValueStateDescriptor<>("Sum", Long.class);
+                sum = getRuntimeContext().getState(sumDesc);
+                ValueStateDescriptor<Long> countDesc = new ValueStateDescriptor<>("Count", Long.class);
+                count = getRuntimeContext().getState(countDesc);
+            }
+
+            @Override
+            public void processElement(Tuple8<String, String, String, String, String, String, String, Long> value, Context ctx, Collector<Tuple2<String, Double>> out) throws Exception {
+                if (null == sum.value() || count.value() == null) {
+                    sum.update(0L);
+                    count.update(0L);
+                }
+                sum.update(sum.value() + value.f7);
+                count.update(count.value() + 1);
+                out.collect(new Tuple2<>(value.f3, sum.value() * 1.0 / count.value()));
+            }
+        }).print();
+
         env.execute("Cab Analytics");
+    }
+
+
+    private static Tuple3<Integer, String, Long> fakeGroup(Tuple2<String, Long> keyBy) {
+        return new Tuple3<Integer, String, Long>(1, keyBy.f0, keyBy.f1);
     }
 
     private static Tuple8<String, String, String, String, String, String, String, Long> token(String line) {
@@ -88,37 +112,11 @@ public class Playground {
     }
 
 
-    private static class AvgAccumulator {
+    private static class Accumulator {
+        String key;
         Long count;
-        Long sumOfPassengers;
+        Long sum;
     }
 
-    private static class AvgPassengerCnt implements AggregateFunction<Long, AvgAccumulator, Double> {
 
-        @Override
-        public AvgAccumulator createAccumulator() {
-            return new AvgAccumulator();
-        }
-
-        @Override
-        public AvgAccumulator add(Long value, AvgAccumulator accumulator) {
-            AvgAccumulator avgAccumulator = new AvgAccumulator();
-            avgAccumulator.count = accumulator.count + 1;
-            avgAccumulator.sumOfPassengers = accumulator.sumOfPassengers + value;
-            return avgAccumulator;
-        }
-
-        @Override
-        public Double getResult(AvgAccumulator accumulator) {
-            return accumulator.sumOfPassengers * 1.0 / accumulator.count;
-        }
-
-        @Override
-        public AvgAccumulator merge(AvgAccumulator a, AvgAccumulator b) {
-            AvgAccumulator avgAccumulator = new AvgAccumulator();
-            avgAccumulator.sumOfPassengers = a.sumOfPassengers + b.sumOfPassengers;
-            avgAccumulator.count = a.count + b.count;
-            return avgAccumulator;
-        }
-    }
 }
